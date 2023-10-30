@@ -4,12 +4,15 @@ using UnityEngine;
 
 public class BackgroundColorBehavior : MonoBehaviour
 {
+    //Singleton
     public static BackgroundColorBehavior Instance;
 
+    //Current camera
     Camera _camera;
 
     private void Awake()
     {
+        //Singleton pattern
         if (Instance != null && Instance != this)
             Destroy(this);
         else
@@ -21,6 +24,7 @@ public class BackgroundColorBehavior : MonoBehaviour
         _camera = GetComponent<Camera>();
     }
 
+    //When the player levels up, change the background color
     public void LevelUp(int level)
     {
         Color newColor;

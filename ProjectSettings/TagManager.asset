@@ -10,6 +10,7 @@ TagManager:
   - LeftWall
   - RightWall
   - Floor
+  - PowerUp
   layers:
   - Default
   - TransparentFX

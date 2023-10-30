@@ -5,8 +5,10 @@ using UnityEngine;
 
 public class GhostBehavior : MonoBehaviour
 {
+    //Parent pentomino
     PentominoBehavior _parent;
 
+    //Blocks
     [SerializeField] BlockBehavior[] _ghostBlocks;
 
     void Start()
@@ -14,6 +16,7 @@ public class GhostBehavior : MonoBehaviour
         _parent = gameObject.GetComponentInParent<PentominoBehavior>();
     }
 
+    //Can we rotate?
     public bool TryRotation(float z)
     {
         transform.SetPositionAndRotation(_parent.transform.position, _parent.transform.rotation);
@@ -23,6 +26,7 @@ public class GhostBehavior : MonoBehaviour
         return BoardBehavior.Instance.CheckRotation(_ghostBlocks);
     }
 
+    //If the piece is held, set position to parent
     public void Hold()
     {
         transform.SetPositionAndRotation(_parent.transform.position, _parent.transform.rotation);

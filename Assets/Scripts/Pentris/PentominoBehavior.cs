@@ -4,21 +4,27 @@ using UnityEngine;
 
 public class PentominoBehavior : MonoBehaviour
 {
-    public BlockBehavior[] Blocks;
+    //Child blocks
+    public GameObject[] Blocks;
 
-    BoardBehavior _parent;
+    //Parent board
+    public BoardBehavior Parent;
 
-    PlayerBehavior _player;
+    //Current player
+    public PlayerBehavior Player;
 
+    //Child ghost
     [SerializeField] GhostBehavior _ghost;
     public GhostBehavior Ghost { get => _ghost; }
 
+    //Child shadow
     [SerializeField] ShadowBehavior _shadow;
     public ShadowBehavior Shadow { get => _shadow; }
 
-    SpriteRenderer[] _sprites;
+    //Coroutine for falling over time
+    public IEnumerator FallCoroutine;
 
-    IEnumerator _fallCoroutine;
+    //Are we falling?
     bool _falling;
     public bool Falling
     {
@@ -27,40 +33,55 @@ public class PentominoBehavior : MonoBehaviour
         {
             _falling = value;
 
+            //Toggle the coroutine for falling over time
             if (value)
-                StartCoroutine(_fallCoroutine);
+                StartCoroutine(FallCoroutine);
             else
-                StopCoroutine(_fallCoroutine);
+                StopCoroutine(FallCoroutine);
         }
     }
 
-    bool _waitingLeft;
-    bool _waitingRight;
-    bool _waitingDown;
+    //Are we allowed to move in each direction?
+    //Used for timing when holding a button down
+    public bool WaitingLeft;
+    public bool WaitingRight;
+    public bool WaitingDown;
     public bool Waiting
     {
-        get => _waitingLeft && _waitingRight && _waitingDown;
+        get => WaitingLeft && WaitingRight && WaitingDown;
         set
         {
-            _waitingLeft = value;
-            _waitingRight = value;
-            _waitingDown = value;
+            WaitingLeft = value;
+            WaitingRight = value;
+            WaitingDown = value;
         }
     }
 
-    bool _holdingLeft;
-    bool _holdingRight;
-    bool _holdingDown;
+    //Are we holding the button for any direction?
+    public bool HoldingLeft;
+    public bool HoldingRight;
+    public bool HoldingDown;
 
+    //Is this pentomino a ghost?
     public bool IsGhost = false;
 
+    //Is this pentomino the next one up?
     public bool IsNext;
 
+    //How much do we have to move the pieces so they fit in the held/next boxes?
+    //Also used for spawning at the top of the board
     [SerializeField] float _xOffset;
     public float XOffset { get => _xOffset; }
     [SerializeField] float _yOffset;
     public float YOffset { get => _yOffset; }
+    [SerializeField] float _yDepth;
+    public float YDepth { get => _yDepth; }
 
+    //Is this a power up?
+    public bool IsPowerUp;
+
+    //What's the name of this piece?
+    //Not actually used, just for funsies
     [SerializeField] string _name;
 
     void Start()
@@ -69,184 +90,213 @@ public class PentominoBehavior : MonoBehaviour
         {
             GameBehavior.Instance.ActivePentominoes.Add(this);
 
-            _parent = GetComponentInParent<BoardBehavior>();
-            _player = GetComponentInParent<PlayerBehavior>();
+            Parent = GetComponentInParent<BoardBehavior>();
+            Player = GetComponentInParent<PlayerBehavior>();
 
             _ghost = GetComponentInChildren<GhostBehavior>();
             _shadow = GetComponentInChildren<ShadowBehavior>();
 
-            _fallCoroutine = DropOverTime();
+            FallCoroutine = DropOverTime(BoardBehavior.Instance.FallSpeed);
 
             Reset();
         }
     }
 
-    public void Reset()
+    //Used to reset the board between games
+    public virtual void Reset()
     {
-        _parent.UpdateCurrentPosition(Blocks);
+        Parent.UpdateCurrentPosition(Blocks);
 
         Waiting = false;
         Falling = true;
 
-        _holdingLeft = false;
-        _holdingRight = false;
-        _holdingDown = false;
+        HoldingLeft = false;
+        HoldingRight = false;
+        HoldingDown = false;
     }
 
+    //Checks for movement controls
     void Update()
     {
         if (GameBehavior.Instance.CurrentState == GameBehavior.GameState.Running)
         {
             if (_falling)
             {
-                if (Input.GetKey(_player.MoveLeft) && !_waitingLeft)
+                if (Input.GetKey(Player.MoveLeft) && !WaitingLeft)
                     MoveLeft();
                 
-                if (Input.GetKey(_player.MoveRight) && !_waitingRight)
+                if (Input.GetKey(Player.MoveRight) && !WaitingRight)
                     MoveRight();
                 
-                if (Input.GetKey(_player.MoveDown) && !_waitingDown)
+                if (Input.GetKey(Player.MoveDown) && !WaitingDown)
                     MoveDown();
 
                 
-                if (Input.GetKeyDown(_player.RotateClockwise))
+                if (Input.GetKeyDown(Player.RotateClockwise))
                     RotateClockwise();
 
-                if (Input.GetKeyDown(_player.HardDrop))
+                if (Input.GetKeyDown(Player.HardDrop))
                     HardDrop();
 
-                if (Input.GetKeyDown(_player.Hold))
+                if (Input.GetKeyDown(Player.Hold))
                     Hold();
 
 
-                if (Input.GetKeyUp(_player.MoveLeft))
-                    _holdingLeft = false;
+                if (Input.GetKeyUp(Player.MoveLeft))
+                    HoldingLeft = false;
 
-                if (Input.GetKeyUp(_player.MoveRight))
-                    _holdingRight = false;
+                if (Input.GetKeyUp(Player.MoveRight))
+                    HoldingRight = false;
 
-                if (Input.GetKeyUp(_player.MoveDown))
-                    _holdingDown = false;
+                if (Input.GetKeyUp(Player.MoveDown))
+                    HoldingDown = false;
             }
         }
     }
 
-    IEnumerator DropOverTime()
+    //Drops the piece over time
+    public IEnumerator DropOverTime(float fallDelay)
     {
+        Debug.Log("Coroutine Started: " + fallDelay);
         while (_falling)
         {
-            yield return new WaitForSeconds(BoardBehavior.Instance.FallSpeed);
-            if(!_waitingDown && GameBehavior.Instance.CurrentState == GameBehavior.GameState.Running)
+            yield return new WaitForSeconds(fallDelay);
+            if(!WaitingDown && GameBehavior.Instance.CurrentState == GameBehavior.GameState.Running)
                 MoveDown();
         }
     }
 
-    void MoveLeft()
+    //Translates the piece left
+    public void MoveLeft()
     {
-        if (_parent.CheckTranslation(-1, 0))
+        if (Parent.CheckTranslation(-1, 0))
         {
             transform.Translate(new Vector3(-0.5f, 0, 0), Space.World);
-            _parent.UpdateTranslation(-1, 0);
-            _shadow.UpdateMovement();
+            Parent.UpdateTranslation(-1, 0);
 
-            if (_holdingLeft)
+            //Power ups don't have shadows, so check before updating
+            if(!IsPowerUp)
+                _shadow.UpdateMovement();
+
+            //If we're holding the piece, delay movement so it isn't too fast
+            if (HoldingLeft)
             {
                 StartCoroutine(WaitLeft(GameBehavior.Instance.CursorMoveDelay));
             }
+            //If we aren't, wait a bit longer and hold the piece
+            //Makes subtle one-block movements easier
             else
             {
-                _holdingLeft = true;
+                HoldingLeft = true;
                 StartCoroutine(WaitLeft(GameBehavior.Instance.CursorInitialDelay));
             }
         }
     }
 
-    void MoveRight()
+    //Translates the piece right
+    //Similar implementation to "MoveLeft"
+    public void MoveRight()
     {
         if (BoardBehavior.Instance.CheckTranslation(1, 0))
         {
             transform.Translate(new Vector3(0.5f, 0, 0), Space.World);
-            _parent.UpdateTranslation(1, 0);
-            _shadow.UpdateMovement();
+            Parent.UpdateTranslation(1, 0);
 
-            if (_holdingRight)
+            if(!IsPowerUp)
+                _shadow.UpdateMovement();
+
+            if (HoldingRight)
             {
                 StartCoroutine(WaitRight(GameBehavior.Instance.CursorMoveDelay));
             }
             else
             {
-                _holdingRight = true;
+                HoldingRight = true;
                 StartCoroutine(WaitRight(GameBehavior.Instance.CursorInitialDelay));
             }
         }
     }
 
-    void MoveDown()
+    //Translates the piece right
+    //Similar implementation to "MoveLeft"
+    public void MoveDown()
     {
-        if (_parent.CheckTranslation(0, -1))
+        if (Parent.CheckTranslation(0, -1))
         {
             transform.Translate(new Vector3(0, -0.5f, 0), Space.World);
-            _parent.UpdateTranslation(0, -1);
-            _shadow.UpdateMovement();
+            Parent.UpdateTranslation(0, -1);
 
-            if (_holdingDown)
+            if(!IsPowerUp)
+                _shadow.UpdateMovement();
+
+            if (HoldingDown)
             {
                 StartCoroutine(WaitDown(GameBehavior.Instance.CursorMoveDelay));
             }
             else
             {
-                _holdingDown = true;
+                HoldingDown = true;
                 StartCoroutine(WaitDown(GameBehavior.Instance.CursorInitialDelay));
             }
         }
+        //If the piece can't move down, lock it in
         else
         {
             LockIn();
         }
     }
 
+    //Don't let the piece move left for a bit
     IEnumerator WaitLeft(float seconds)
     {
-        _waitingLeft = true;
+        WaitingLeft = true;
         yield return new WaitForSeconds(seconds);
-        _waitingLeft = false;
+        WaitingLeft = false;
     }
 
+    //Don't let the piece move right for a bit
     IEnumerator WaitRight(float seconds)
     {
-        _waitingRight = true;
+        WaitingRight = true;
         yield return new WaitForSeconds(seconds);
-        _waitingRight = false;
+        WaitingRight = false;
     }
 
+    //Don't let the piece move down for a bit
     IEnumerator WaitDown(float seconds)
     {
-        _waitingDown = true;
+        WaitingDown = true;
         yield return new WaitForSeconds(seconds);
-        _waitingDown = false;
+        WaitingDown = false;
     }
 
+    //Rotate the piece clockwise
     void RotateClockwise()
     {
+        //If the ghost can do it, move the parent
         if (_ghost.TryRotation(90))
         {
             transform.Rotate(0, 0, 90);
             _ghost.transform.Rotate(0, 0, -90);
-            _parent.UpdateRotation();
+            Parent.UpdateRotation();
             _shadow.UpdateMovement();
         }
     }
 
-    void HardDrop()
+    //Drops the piece to the bottom of the board
+    public virtual void HardDrop()
     {
+        //Moves parent to the current location of the shadow
+        Falling = false;
         transform.SetPositionAndRotation(_shadow.transform.position, _shadow.transform.rotation);
-        _parent.UpdateTranslation(0, _shadow.yDepth);
+        Parent.UpdateTranslation(0, _shadow.yDepth);
         LockIn();
     }
 
-    void Hold()
+    //Holds a piece for future use
+    public virtual void Hold()
     {
-        if (_parent.HoldPentomino(this, _xOffset, _yOffset))
+        if (Parent.HoldPentomino(this, _xOffset, _yOffset))
         {
             Falling = false;
             Waiting = true;
@@ -255,40 +305,43 @@ public class PentominoBehavior : MonoBehaviour
         }
     }
 
-    public void LockIn()
+    //Locks the piece onto the board
+    public virtual void LockIn()
     {
-        _falling = false;
+        Falling = false;
+
+        //StartCoroutine(LockInAnimation());
 
         transform.DetachChildren();
 
         _shadow.LockIn();
 
-        StartCoroutine(LockInAnimation());
-
-        _parent.LockIn();
+        Parent.LockIn();
     }
 
-    IEnumerator LockInAnimation()
-    {
-        _sprites = GetComponentsInChildren<SpriteRenderer>();
-        foreach (SpriteRenderer s in _sprites)
-        {
-            Color newColor = s.color;
-            newColor.a -= 50;
-            s.color = newColor;
-        }
-        yield return new WaitForSeconds(0.2f);
-        foreach (SpriteRenderer s in _sprites)
-        {
-            Color newColor = s.color;
-            newColor.a += 50;
-            s.color = newColor;
-        }
-    }
+    //IEnumerator LockInAnimation()
+    //{
+    //    _sprites = GetComponentsInChildren<SpriteRenderer>();
+    //    yield return new WaitForSeconds(0.05f);
+    //    foreach (SpriteRenderer s in _sprites)
+    //    {
+    //        Color newColor = s.color;
+    //        newColor.a -= 0.5f;
+    //        s.color = newColor;
+    //    }
+    //    yield return new WaitForSeconds(0.1f);
+    //    foreach (SpriteRenderer s in _sprites)
+    //    {
+    //        Color newColor = s.color;
+    //        newColor.a += 0.5f;
+    //        s.color = newColor;
+    //    }
+    //}
 
+    //Are the blocks in this piece all destroyed?
     public bool CheckEmpty()
     {
-        foreach(BlockBehavior b in Blocks)
+        foreach(GameObject b in Blocks)
         {
             if (b != null)
                 return false;
@@ -296,9 +349,10 @@ public class PentominoBehavior : MonoBehaviour
         return true;
     }
 
+    //Removes pentomino from the board and destroys it
     public void DestroyInstance()
     {
         GameBehavior.Instance.ActivePentominoes.Remove(this);
-        Destroy(this);
+        Destroy(gameObject);
     }
 }

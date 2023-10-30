@@ -1277,17 +1277,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Blocks:
-  - {fileID: 3698321935563955910}
-  - {fileID: 810175452468461257}
-  - {fileID: 4127261031867705034}
-  - {fileID: 7682238168704931973}
-  - {fileID: 829494210022685722}
+  - {fileID: 5147725835788168381}
+  - {fileID: 3772559313575949553}
+  - {fileID: 6895843813488689010}
+  - {fileID: 4408932565093610995}
+  - {fileID: 4797235456073749801}
   _ghost: {fileID: 7797991941831886807}
   _shadow: {fileID: 6195477551166959732}
   IsGhost: 0
   IsNext: 0
   _xOffset: 0
   _yOffset: 0
+  _yDepth: 0.5
   _name: Xavier
 --- !u!1 &7095030273070971989
 GameObject:
